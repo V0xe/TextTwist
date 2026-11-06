@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#3182ce">
+    <title>번역기 뺑뺑이 (다국어 릴레이)</title>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 16px 14px calc(24px + env(safe-area-inset-bottom));
+            background-color: #f5f6f7;
+            color: #333;
+        }
+        h1 { text-align: center; color: #4a5568; font-size: 24px; margin: 8px 0 16px; }
+        .container { background: white; padding: 18px; border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        label { font-weight: bold; display: block; margin-top: 18px; margin-bottom: 6px; }
+        textarea, select, input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            box-sizing: border-box;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            font-size: 16px;
+            font-family: inherit;
+            background: #fff;
+        }
+        textarea { resize: vertical; height: 120px; }
+        input[type="number"] { min-height: 48px; }
+        button { font-family: inherit; }
+        button#startBtn {
+            width: 100%;
+            min-height: 52px;
+            background-color: #3182ce;
+            color: white;
+            border: none;
+            padding: 12px;
+            font-size: 17px;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-top: 20px;
+            touch-action: manipulation;
+            transition: background 0.2s, transform 0.05s;
+        }
+        button#startBtn:active { transform: scale(0.98); background-color: #2b6cb0; }
+        button#startBtn:disabled { background-color: #cbd5e1; cursor: not-allowed; }
+        .result-box {
+            padding: 14px;
+            background-color: #edf2f7;
+            border-left: 5px solid #3182ce;
+            border-radius: 6px;
+            word-break: break-word;
+            font-size: 16px;
+            line-height: 1.55;
+        }
+
+        /* 접이식 언어 선택 */
+        .language-panel {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #fff;
+            overflow: hidden;
+        }
+        .language-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            min-height: 48px;
+            padding: 12px;
+            border: 0;
+            background: #fff;
+            color: #334155;
+            text-align: left;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        .language-toggle-title { font-weight: bold; }
+        .language-toggle-summary {
+            margin-left: auto;
+            color: #64748b;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        .language-chevron {
+            color: #64748b;
+            font-size: 18px;
+            line-height: 1;
+            transition: transform 0.2s;
+        }
+        .language-toggle[aria-expanded="true"] .language-chevron {
+            transform: rotate(180deg);
+        }
+        .language-panel-content { padding: 0 12px 12px; }
+        .language-panel-content[hidden] { display: none !important; }
+        .language-actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .small-btn {
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            color: #334155;
+            border-radius: 8px;
+            padding: 7px 10px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .language-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+        .language-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            padding: 8px;
+            border-radius: 8px;
+            background: #f8fafc;
+            font-size: 14px;
+            font-weight: normal;
+            cursor: pointer;
+            min-width: 0;
+        }
+        .language-option input { width: 17px; height: 17px; margin: 0; flex-shrink: 0; accent-color: #3182ce; }
+        .language-option span { overflow-wrap: anywhere; }
+        .selection-summary { margin: 10px 0 0; color: #64748b; font-size: 13px; }
+        .notice {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .notice.warning { color: #92400e; background: #fffbeb; border: 1px solid #fde68a; }
+        .notice.info { color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; }
+        .hidden { display: none !important; }
+
+        /* 경로 라벨 + 토글 */
+        .log-head { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; margin-bottom: 6px; }
+        .log-head label { margin: 0; }
+        .switch { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: #4a5568; cursor: pointer; user-select: none; padding: 6px 0 6px 10px; touch-action: manipulation; }
+        .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .track { width: 44px; height: 26px; background: #cbd5e1; border-radius: 13px; position: relative; transition: background 0.2s; flex-shrink: 0; }
+        .track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; background: #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.2s; }
+        .switch input:checked + .track { background: #3182ce; }
+        .switch input:checked + .track::after { transform: translateX(18px); }
+        .switch input:focus-visible + .track { outline: 2px solid #90cdf4; outline-offset: 2px; }
+
+        /* 로그 */
+        .process-log {
+            font-size: 14px;
+            color: #718096;
+            line-height: 1.5;
+            background: #fff;
+            padding: 6px 12px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            max-height: 45vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .step { padding: 6px 0; }
+        .step-title { color: #4a5568; }
+        .step-title.pending::after { content: ' …'; color: #a0aec0; }
+        .step-text { display: none; margin-top: 4px; padding: 8px 10px; background: #f7fafc; border-radius: 8px; color: #2d3748; white-space: pre-wrap; word-break: break-word; }
+        .step-text.fail { display: block; color: #e53e3e; background: #fff5f5; }
+        .process-log.show-details .step { border-bottom: 1px dashed #e2e8f0; padding: 8px 0; }
+        .process-log.show-details .step:last-child { border-bottom: none; }
+        .process-log.show-details .step-text { display: block; }
+        .process-log.show-details .step-title { font-weight: bold; }
+        .process-log.show-details .step-text.pending { color: #a0aec0; }
+
+        @media (min-width: 640px) {
+            body { margin-top: 40px; padding: 20px; }
+            .container { padding: 25px; }
+            h1 { font-size: 28px; }
+            .language-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>번역기 뺑뺑이</h1>
+
+    <label for="inputText" style="margin-top:0">원문 입력 (한국어)</label>
+    <textarea id="inputText" maxlength="500" placeholder="문장 입력"></textarea>
+
+    <label for="stepCount">번역 단계 수</label>
+    <input id="stepCount" type="number" min="2" step="1" value="3" inputmode="numeric">
+
+    <div class="language-panel" id="languagePanel">
+        <button type="button" class="language-toggle" id="languagePanelToggle"
+                aria-expanded="false" aria-controls="languagePanelContent">
+            <span class="language-toggle-title">사용할 언어 선택</span>
+            <span class="language-toggle-summary" id="languageToggleSummary">16개 선택</span>
+            <span class="language-chevron" aria-hidden="true">⌄</span>
+        </button>
+        <div class="language-panel-content" id="languagePanelContent" hidden>
+            <div class="language-actions">
+                <button type="button" class="small-btn" id="selectAllBtn">전체 선택</button>
+                <button type="button" class="small-btn" id="clearAllBtn">전체 해제</button>
+            </div>
+            <div class="language-grid" id="languageOptions"></div>
+            <p class="selection-summary" id="selectionSummary" aria-live="polite"></p>
+        </div>
+    </div>
+    <div class="notice warning hidden" id="dynamicWarning" role="status"></div>
+
+    <button id="startBtn" onclick="runTranslator()">뺑뺑이</button>
+
+    <div id="resultContainer" style="display:none;">
+        <label>번역 결과</label>
+        <div class="result-box" id="finalResult"></div>
+
+        <div class="log-head">
+            <label>경로</label>
+            <label class="switch" for="detailToggle">
+                <span>중간 결과 보기</span>
+                <input type="checkbox" id="detailToggle">
+                <span class="track"></span>
+            </label>
+        </div>
+        <div class="process-log" id="processLog"></div>
+    </div>
+</div>
+
+<script>
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    // 언어 목록: 체크한 언어만 번역 경로에 사용
+    const languages = [
+        {code: 'ja',    name: '일본어'},
+        {code: 'en',    name: '영어'},
+        {code: 'zh-CN', name: '중국어'},
+        {code: 'ru',    name: '러시아어'},
+        {code: 'de',    name: '독일어'},
+        {code: 'fr',    name: '프랑스어'},
+        {code: 'ar',    name: '아랍어'},
+        {code: 'el',    name: '그리스어'},
+        {code: 'la',    name: '라틴어'},
+        {code: 'vi',    name: '베트남어'},
+        {code: 'es',    name: '스페인어'},
+        {code: 'it',    name: '이탈리아어'},
+        {code: 'hi',    name: '힌디어'},
+        {code: 'tr',    name: '터키어'},
+        {code: 'th',    name: '태국어'},
+        {code: 'pt',    name: '포르투갈어'}
+    ];
+    const KOREAN = {code: 'ko', name: '한국어'};
+
+    const languageOptions = document.getElementById('languageOptions');
+    const languagePanel = document.getElementById('languagePanel');
+    const languagePanelToggle = document.getElementById('languagePanelToggle');
+    const languagePanelContent = document.getElementById('languagePanelContent');
+    const languageToggleSummary = document.getElementById('languageToggleSummary');
+    const stepCountInput = document.getElementById('stepCount');
+    const selectionSummary = document.getElementById('selectionSummary');
+    const dynamicWarning = document.getElementById('dynamicWarning');
+
+    function setLanguagePanelExpanded(expanded) {
+        languagePanelContent.hidden = !expanded;
+        languagePanelToggle.setAttribute('aria-expanded', String(expanded));
+    }
+
+    languagePanelToggle.addEventListener('click', () => {
+        const expanded = languagePanelToggle.getAttribute('aria-expanded') === 'true';
+        setLanguagePanelExpanded(!expanded);
+    });
+
+    // 기본값은 기존 프로그램처럼 모든 언어 선택
+    function buildLanguageOptions() {
+        for (const language of languages) {
+            const label = document.createElement('label');
+            label.className = 'language-option';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = language.code;
+            checkbox.checked = true;
+            checkbox.className = 'language-checkbox';
+            checkbox.addEventListener('change', updateSelectionInfo);
+
+            const name = document.createElement('span');
+            name.textContent = language.name;
+
+            label.appendChild(checkbox);
+            label.appendChild(name);
+            languageOptions.appendChild(label);
+        }
+        updateSelectionInfo();
+    }
+
+    function getSelectedLanguages() {
+        const selectedCodes = new Set(
+            Array.from(document.querySelectorAll('.language-checkbox:checked'))
+                .map(checkbox => checkbox.value)
+        );
+        return languages.filter(language => selectedCodes.has(language.code));
+    }
+
+    // 선택 언어 수와 단계 수에 따라 경고를 실시간 갱신
+    function updateSelectionInfo() {
+        const selectedCount = getSelectedLanguages().length;
+        const rawStepCount = Number(stepCountInput.value);
+        const validStepCount = Number.isInteger(rawStepCount) && rawStepCount >= 2;
+        const foreignSteps = validStepCount ? rawStepCount - 1 : 0;
+
+        selectionSummary.textContent = `선택한 언어: ${selectedCount}개 / 외국어 번역 단계: ${validStepCount ? foreignSteps : '입력 필요'}단계`;
+        languageToggleSummary.textContent = `${selectedCount}개 선택`;
+
+        const warnings = [];
+        if (selectedCount === 0) {
+            warnings.push('언어를 최소 1개 선택해야 번역을 시작할 수 있어.');
+        } else if (validStepCount && selectedCount < foreignSteps) {
+            warnings.push(`외국어 단계는 ${foreignSteps}개인데 선택한 언어는 ${selectedCount}개야. 선택한 언어가 반복해서 사용될 수 있어.`);
+        }
+        if (validStepCount && rawStepCount > 20) {
+            warnings.push('단계 수가 많아 번역에 시간이 오래 걸릴 수 있고, 번역 서비스에서 요청을 일시적으로 제한할 수 있어.');
+        }
+
+        dynamicWarning.textContent = warnings.join(' ');
+        dynamicWarning.classList.toggle('hidden', warnings.length === 0);
+    }
+
+    document.getElementById('selectAllBtn').addEventListener('click', () => {
+        document.querySelectorAll('.language-checkbox').forEach(checkbox => checkbox.checked = true);
+        updateSelectionInfo();
+    });
+    document.getElementById('clearAllBtn').addEventListener('click', () => {
+        document.querySelectorAll('.language-checkbox').forEach(checkbox => checkbox.checked = false);
+        updateSelectionInfo();
+    });
+    stepCountInput.addEventListener('input', updateSelectionInfo);
+    buildLanguageOptions();
+
+    // 중간 결과 보기 토글
+    document.getElementById('detailToggle').addEventListener('change', (event) => {
+        const log = document.getElementById('processLog');
+        log.classList.toggle('show-details', event.target.checked);
+        log.scrollTop = log.scrollHeight;
+    });
+
+    // 구글 번역 비공식 엔드포인트 (API 키 불필요)
+    async function translateOnce(text, from, to) {
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${from}&tl=${to}&dt=t&q=${encodeURIComponent(text)}`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (!Array.isArray(data) || !Array.isArray(data[0])) {
+            throw new Error('번역 서비스에서 예상하지 못한 응답을 받았어.');
+        }
+        return data[0].map(segment => segment[0] || '').join('');
+    }
+
+    // 실패하면 1초 쉬고 한 번 더 시도
+    async function translateText(text, from, to) {
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                return {ok: true, text: await translateOnce(text, from, to)};
+            } catch (error) {
+                if (attempt === 0) {
+                    await sleep(1000);
+                    continue;
+                }
+                return {ok: false, text, reason: error.message || '알 수 없는 오류'};
+            }
+        }
+        return {ok: false, text, reason: '번역 실패'};
+    }
+
+    // 선택한 언어 중에서 다음 언어를 무작위로 선택
+    // 선택 언어가 2개 이상이면 바로 직전과 같은 언어는 가급적 피함
+    function pickNextLanguage(selectedLanguages, currentLanguage) {
+        let candidates = selectedLanguages.filter(language => language.code !== currentLanguage.code);
+        if (candidates.length === 0) candidates = selectedLanguages;
+        return candidates[Math.floor(Math.random() * candidates.length)];
+    }
+
+    // 로그에 단계 추가. textContent를 사용해 특수문자도 안전하게 표시
+    function addStep(logElement, title, text, pending) {
+        const step = document.createElement('div');
+        step.className = 'step';
+        const titleElement = document.createElement('div');
+        titleElement.className = 'step-title' + (pending ? ' pending' : '');
+        titleElement.textContent = title;
+        const bodyElement = document.createElement('div');
+        bodyElement.className = 'step-text' + (pending ? ' pending' : '');
+        bodyElement.textContent = text;
+        step.appendChild(titleElement);
+        step.appendChild(bodyElement);
+        logElement.appendChild(step);
+        logElement.scrollTop = logElement.scrollHeight;
+        return {title: titleElement, body: bodyElement};
+    }
+
+    function finishStep(logElement, step, text, failed) {
+        step.title.classList.remove('pending');
+        step.body.classList.remove('pending');
+        step.body.textContent = text;
+        if (failed) step.body.classList.add('fail');
+        logElement.scrollTop = logElement.scrollHeight;
+    }
+
+    async function runTranslator() {
+        const inputText = document.getElementById('inputText').value.trim();
+        const stepCount = Number(stepCountInput.value);
+        const selectedLanguages = getSelectedLanguages();
+        const startBtn = document.getElementById('startBtn');
+        const resultContainer = document.getElementById('resultContainer');
+        const finalResult = document.getElementById('finalResult');
+        const processLog = document.getElementById('processLog');
+
+        if (!inputText) {
+            alert('문장을 입력해 줘.');
+            return;
+        }
+        if (!Number.isInteger(stepCount) || stepCount < 2) {
+            alert('번역 단계는 2 이상의 정수로 입력해 줘.');
+            stepCountInput.focus();
+            return;
+        }
+        if (selectedLanguages.length === 0) {
+            alert('사용할 언어를 최소 1개 선택해 줘.');
+            setLanguagePanelExpanded(true);
+            languagePanel.scrollIntoView({behavior: 'smooth', block: 'center'});
+            return;
+        }
+        if (stepCount > 20) {
+            const proceed = confirm(
+                `총 ${stepCount}단계 번역을 실행할 거야.\n` +
+                '단계가 많으면 시간이 오래 걸리고 번역 서비스에서 요청을 제한할 수 있어.\n\n계속할까?'
+            );
+            if (!proceed) return;
+        }
+
+        startBtn.disabled = true;
+        startBtn.innerText = '뺑뺑이 돌리는 중';
+        resultContainer.style.display = 'block';
+        finalResult.textContent = '번역 중...';
+        processLog.innerHTML = '';
+
+        let currentText = inputText;
+        let current = KOREAN;
+        let failCount = 0;
+        let stepNo = 0;
+        const foreignStepCount = stepCount - 1;
+
+        addStep(processLog, '시작: 한국어', inputText);
+
+        // 요청한 외국어 단계만큼 선택된 언어 중에서 무작위로 고름.
+        // 선택한 언어 수보다 단계가 많으면 같은 언어가 다시 나올 수 있음.
+        const route = [];
+        let plannedCurrent = KOREAN;
+        for (let i = 0; i < foreignStepCount; i++) {
+            const nextLanguage = pickNextLanguage(selectedLanguages, plannedCurrent);
+            route.push(nextLanguage);
+            plannedCurrent = nextLanguage;
+        }
+        route.push(KOREAN);
+
+        for (const next of route) {
+            stepNo++;
+            const step = addStep(processLog, `➡️ ${current.name} → ${next.name}`, '번역 중...', true);
+            const result = await translateText(currentText, current.code, next.code);
+
+            if (result.ok) {
+                currentText = result.text;
+                current = next;
+                finishStep(processLog, step, result.text, false);
+            } else {
+                failCount++;
+                finishStep(processLog, step, `실패: ${result.reason} (현재 문장을 유지하고 다음 단계로 진행)`, true);
+            }
+            await sleep(300);
+        }
+
+        // 마지막 단계가 실패해서 한국어로 돌아오지 못했다면 한 번 더 시도
+        if (current.code !== KOREAN.code) {
+            stepNo++;
+            const step = addStep(processLog, `➡️ ${current.name} → 한국어 (복귀 재시도)`, '번역 중...', true);
+            const result = await translateText(currentText, current.code, KOREAN.code);
+            if (result.ok) {
+                currentText = result.text;
+                current = KOREAN;
+                finishStep(processLog, step, result.text, false);
+            } else {
+                failCount++;
+                finishStep(processLog, step, `실패: ${result.reason}`, true);
+            }
+        }
+
+        finalResult.textContent = '';
+        const strong = document.createElement('strong');
+        strong.textContent = currentText;
+        finalResult.appendChild(strong);
+
+        const completionMessage = current.code === KOREAN.code
+            ? `총 ${stepNo}단계 실행 · 외국어 ${foreignStepCount}단계 · 실패 ${failCount}회`
+            : `한국어 복귀 실패 · 총 ${stepNo}단계 실행 · 실패 ${failCount}회`;
+        addStep(processLog, failCount > 0 ? `🏁 완료! (실패 ${failCount}회)` : '🏁 완료!', completionMessage);
+
+        startBtn.disabled = false;
+        startBtn.innerText = '뺑뺑이';
+    }
+</script>
+</body>
+</html>
