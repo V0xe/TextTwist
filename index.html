@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#3182ce">
-    <title>번역기 뺑뺑이 (다국어 릴레이)</title>
+    <title>번역기 뺑뺑이</title>
     <style>
         * { -webkit-tap-highlight-color: transparent; }
         body {
@@ -29,7 +29,7 @@
             background: #fff;
         }
         textarea { resize: vertical; height: 120px; }
-        input[type="number"] { min-height: 48px; }
+        select { min-height: 48px; }
         button { font-family: inherit; }
         button#startBtn {
             width: 100%;
@@ -194,7 +194,12 @@
     <textarea id="inputText" maxlength="500" placeholder="문장 입력"></textarea>
 
     <label for="stepCount">번역 단계 수</label>
-    <input id="stepCount" type="number" min="2" step="1" value="3" inputmode="numeric">
+    <select id="stepCount">
+        <option value="3">3단계 (언어 2개 거치기)</option>
+        <option value="5">5단계 (언어 4개 거치기)</option>
+        <option value="8">8단계 (언어 7개 거치기)</option>
+        <option value="12">12단계 (언어 11개 거치기)</option>
+    </select>
 
     <div class="language-panel" id="languagePanel">
         <button type="button" class="language-toggle" id="languagePanelToggle"
@@ -318,12 +323,12 @@
 
         const warnings = [];
         if (selectedCount === 0) {
-            warnings.push('언어를 최소 1개 선택해야 번역을 시작할 수 있어.');
+            warnings.push('언어를 최소 1개 선택해야 번역을 시작할 수 있어');
         } else if (validStepCount && selectedCount < foreignSteps) {
-            warnings.push(`외국어 단계는 ${foreignSteps}개인데 선택한 언어는 ${selectedCount}개야. 선택한 언어가 반복해서 사용될 수 있어.`);
+            warnings.push(`외국어 단계는 ${foreignSteps}개인데 선택한 언어는 ${selectedCount}개야 선택한 언어가 반복해서 사용될 수 있어`);
         }
         if (validStepCount && rawStepCount > 20) {
-            warnings.push('단계 수가 많아 번역에 시간이 오래 걸릴 수 있고, 번역 서비스에서 요청을 일시적으로 제한할 수 있어.');
+            warnings.push('단계 수가 많아서 죽을수도 있어');
         }
 
         dynamicWarning.textContent = warnings.join(' ');
@@ -338,7 +343,7 @@
         document.querySelectorAll('.language-checkbox').forEach(checkbox => checkbox.checked = false);
         updateSelectionInfo();
     });
-    stepCountInput.addEventListener('input', updateSelectionInfo);
+    stepCountInput.addEventListener('change', updateSelectionInfo);
     buildLanguageOptions();
 
     // 중간 결과 보기 토글
@@ -355,7 +360,7 @@
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (!Array.isArray(data) || !Array.isArray(data[0])) {
-            throw new Error('번역 서비스에서 예상하지 못한 응답을 받았어.');
+            throw new Error('번역 서비스에서 예상하지 못한 응답을 받았어');
         }
         return data[0].map(segment => segment[0] || '').join('');
     }
@@ -419,24 +424,19 @@
         const processLog = document.getElementById('processLog');
 
         if (!inputText) {
-            alert('문장을 입력해 줘.');
-            return;
-        }
-        if (!Number.isInteger(stepCount) || stepCount < 2) {
-            alert('번역 단계는 2 이상의 정수로 입력해 줘.');
-            stepCountInput.focus();
+            alert('바보냐');
             return;
         }
         if (selectedLanguages.length === 0) {
-            alert('사용할 언어를 최소 1개 선택해 줘.');
+            alert('바보냐');
             setLanguagePanelExpanded(true);
             languagePanel.scrollIntoView({behavior: 'smooth', block: 'center'});
             return;
         }
         if (stepCount > 20) {
             const proceed = confirm(
-                `총 ${stepCount}단계 번역을 실행할 거야.\n` +
-                '단계가 많으면 시간이 오래 걸리고 번역 서비스에서 요청을 제한할 수 있어.\n\n계속할까?'
+                `총 ${stepCount}단계 번역을 실행할 거야\n` +
+                '단계가 많으면 시간이 오래 걸리고 제한 걸릴수 있음\n\n계속할까?'
             );
             if (!proceed) return;
         }
@@ -444,7 +444,7 @@
         startBtn.disabled = true;
         startBtn.innerText = '뺑뺑이 돌리는 중';
         resultContainer.style.display = 'block';
-        finalResult.textContent = '번역 중...';
+        finalResult.textContent = '번역 중';
         processLog.innerHTML = '';
 
         let currentText = inputText;
@@ -468,7 +468,7 @@
 
         for (const next of route) {
             stepNo++;
-            const step = addStep(processLog, `➡️ ${current.name} → ${next.name}`, '번역 중...', true);
+            const step = addStep(processLog, `➡️ ${current.name} → ${next.name}`, '번역 중', true);
             const result = await translateText(currentText, current.code, next.code);
 
             if (result.ok) {
@@ -485,7 +485,7 @@
         // 마지막 단계가 실패해서 한국어로 돌아오지 못했다면 한 번 더 시도
         if (current.code !== KOREAN.code) {
             stepNo++;
-            const step = addStep(processLog, `➡️ ${current.name} → 한국어 (복귀 재시도)`, '번역 중...', true);
+            const step = addStep(processLog, `➡️ ${current.name} → 한국어 (복귀 재시도)`, '번역 중', true);
             const result = await translateText(currentText, current.code, KOREAN.code);
             if (result.ok) {
                 currentText = result.text;
@@ -505,7 +505,7 @@
         const completionMessage = current.code === KOREAN.code
             ? `총 ${stepNo}단계 실행 · 외국어 ${foreignStepCount}단계 · 실패 ${failCount}회`
             : `한국어 복귀 실패 · 총 ${stepNo}단계 실행 · 실패 ${failCount}회`;
-        addStep(processLog, failCount > 0 ? `🏁 완료! (실패 ${failCount}회)` : '🏁 완료!', completionMessage);
+        addStep(processLog, failCount > 0 ? `완료 (실패 ${failCount}회)` : '완료', completionMessage);
 
         startBtn.disabled = false;
         startBtn.innerText = '뺑뺑이';
